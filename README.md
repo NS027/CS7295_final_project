@@ -76,3 +76,9 @@ streamlit run ui_app.py
 4. LLM → chart spec  
 5. Python → aggregated data + plot  
 6. LLM → insights  
+
+## Demo Screenshot
+
+Below is the full workflow of the Streamlit data visualization assistant:
+
+![Demo UI](./assets/snapshot/1.png)
