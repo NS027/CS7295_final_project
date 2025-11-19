@@ -31,42 +31,56 @@ def apply_filters(df: pd.DataFrame, filters: list) -> pd.DataFrame:
 def aggregate_dataframe(df: pd.DataFrame, spec: Dict[str, Any]) -> pd.DataFrame:
     """
     Aggregate dataframe according to the chart spec.
-    Supports: sum, mean, count, none.
+    Supports: sum, mean, count, max, min, median, none.
 
-    - 自动把 y 列转换成数值
-    - 自动避免 group_by 与 x 重复
-    - 聚合后列名统一为 "<agg>_<y>"
+    - Converts y to numeric
+    - Avoids duplicated group_by columns
+    - Names aggregated column as "<agg>_<y>"
     """
     x = spec.get("x")
     y = spec.get("y")
     group_by = spec.get("group_by")
     agg = spec.get("aggregation", "none")
 
-    # 确保 y 列是数值
+    # Defensive: normalize to lowercase string
+    if isinstance(agg, str):
+        agg = agg.lower()
+    else:
+        agg = "none"
+
+    # Work on a copy and ensure y is numeric
     df = df.copy()
     df[y] = pd.to_numeric(df[y], errors="coerce")
 
-    # 不需要聚合就直接返回
-    if agg == "none":
+    # No aggregation -> return original (filtered) df
+    if agg in ("none", "", None):
         return df
 
-    # 构造分组列，去重
+    # Build group columns (deduplicated)
     group_cols = [x]
     if group_by and group_by not in group_cols:
         group_cols.append(group_by)
 
-    # 选择聚合函数
-    if agg == "sum":
-        agg_func = "sum"
-    elif agg == "mean":
-        agg_func = "mean"
-    elif agg == "count":
-        agg_func = "count"
-    else:
-        raise ValueError(f"Unsupported aggregation: {agg}")
+    # Map supported aggregations
+    agg_map = {
+        "sum": "sum",
+        "mean": "mean",
+        "average": "mean",
+        "count": "count",
+        "max": "max",
+        "min": "min",
+        "median": "median",
+    }
 
-    # 聚合并且直接指定新列名，避免 reset_index 的列名冲突
+    if agg not in agg_map:
+        # Fallback: be forgiving and default to mean
+        agg_func = "mean"
+        agg = "mean"
+    else:
+        agg_func = agg_map[agg]
+
     new_col_name = f"{agg}_{y}"
+
     agg_df = (
         df.groupby(group_cols, dropna=False)[y]
         .agg(agg_func)
