@@ -1,0 +1,8 @@
+order_id,customer,category,price,cost,profit,date
+1001,Alice,Electronics,120.5,85.0,35.5,2024-01-01
+1002,Bob,Clothing,45.0,20.0,25.0,2024-01-02
+1003,Cindy,Electronics,89.9,70.0,19.9,2024-01-03
+1004,David,Furniture,220.0,160.0,60.0,2024-01-04
+1005,Emma,Clothing,130.0,55.0,75.0,2024-01-05
+1006,Frank,Electronics,950.0,780.0,170.0,2024-01-06
+1007,Alice,Clothing,125.0,40.0,85.0,2024-01-07
