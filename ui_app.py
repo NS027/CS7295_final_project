@@ -14,9 +14,33 @@ from src.datapipe.viz_executor import aggregate_dataframe
 from src.datapipe.insight import generate_insights
 from src.datapipe.style_refiner import refine_chart_style
 
+import concurrent.futures
+import streamlit.components.v1 as components
+
 # Load .env for API key
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+def generate_chart_specs_batch(questions: list[str], meta: dict, client: OpenAI) -> dict:
+    """
+    Parallel generate chart specs for a batch of questions.
+    Returns: { question_text: spec_dict }
+    """
+    results = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        future_to_q = {
+            executor.submit(generate_chart_spec_from_question, meta, q, client): q 
+            for q in questions
+        }
+        for future in concurrent.futures.as_completed(future_to_q):
+            q = future_to_q[future]
+            try:
+                spec = future.result()
+                results[q] = spec
+            except Exception as e:
+                print(f"Error generating spec for {q}: {e}")
+                results[q] = None
+    return results
 
 st.set_page_config(page_title="LLM Data Visualization Assistant", layout="wide")
 st.title("📊🤖 LLM-Powered Data Visualization Assistant")
@@ -57,144 +81,146 @@ with st.expander("Show JSON metadata"):
     st.json(meta)
 
 # ====================================================
-# 2. Generate LLM questions
+# 2. Generate Dashboard
 # ====================================================
-st.subheader("❓ Auto-generated Analysis Questions")
+st.subheader("📊 Infinite Scroll Dashboard")
 
-if "questions" not in st.session_state:
-    st.session_state["questions"] = None
+# Initialize Session State
+if "all_questions" not in st.session_state:
+    st.session_state["all_questions"] = []
+if "loaded_count" not in st.session_state:
+    st.session_state["loaded_count"] = 4
+if "chart_specs_map" not in st.session_state:
+    st.session_state["chart_specs_map"] = {}
 
-if st.button("✨ Generate 5 questions"):
-    with st.spinner("LLM is generating questions..."):
-        questions_text = suggest_questions_from_meta(meta, client)
-        questions = [q.strip() for q in questions_text.split("\n") if q.strip()]
-        st.session_state["questions"] = questions
-        st.session_state["questions_text"] = questions_text
+# Start Analysis Button
+if not st.session_state["all_questions"]:
+    if st.button("🚀 Start Analysis (Generate 20 Questions)"):
+        with st.spinner("Brainstorming analysis questions..."):
+            questions = suggest_questions_from_meta(meta, client)
+            st.session_state["all_questions"] = questions
+            # Reset
+            st.session_state["loaded_count"] = 4 
+            st.session_state["chart_specs_map"] = {}
+        st.rerun()
 
-if st.session_state["questions"] is None:
-    st.info("Click the button above to generate questions.")
-    st.stop()
+# Main Dashboard Loop
+if st.session_state["all_questions"]:
+    all_qs = st.session_state["all_questions"]
+    current_count = st.session_state["loaded_count"]
+    
+    # Slice needed questions
+    questions_to_show = all_qs[:current_count]
+    
+    # --------------------------------------------------------
+    # 1. RENDER EXISTING CHARTS FIRST (To avoid flicker)
+    # --------------------------------------------------------
+    cols = st.columns(2)
+    
+    # We iterate only through what we have specs for, or show placeholder
+    for i, question in enumerate(questions_to_show):
+        col = cols[i % 2]
+        spec = st.session_state["chart_specs_map"].get(question)
+        
+        with col:
+            st.markdown(f"**Q{i+1}. {question}**")
+            
+            if spec:
+                try:
+                    df_agg = aggregate_dataframe(df, spec)
+                    
+                    chart_type = spec.get("chart_type")
+                    x = spec.get("x")
+                    y = spec.get("y")
+                    agg = spec.get("aggregation", "none")
+                    value_col = f"{agg}_{y}" if agg != "none" else y
+                    
+                    # Chart Preview
+                    if chart_type == "bar":
+                        st.bar_chart(df_agg.set_index(x)[value_col], height=300)
+                    elif chart_type == "line":
+                        st.line_chart(df_agg.set_index(x)[value_col], height=300)
+                    elif chart_type == "scatter":
+                        st.scatter_chart(df_agg, x=x, y=value_col, height=300)
+                    elif chart_type == "histogram":
+                        st.bar_chart(df_agg[value_col], height=300)
+                    
+                    # Details Expander
+                    with st.expander(f"🔍 View Details & Insights"):
+                        st.json(spec)
+                        st.dataframe(df_agg)
+                        
+                        # Lazy Insight
+                        insight_key = f"insight_{i}"
+                        if insight_key not in st.session_state:
+                            st.session_state[insight_key] = None
+                            
+                        if st.button(f"Generate Insight", key=f"btn_insight_{i}"):
+                            with st.spinner("Analyzing..."):
+                                insight = generate_insights(meta, spec, df_agg, client)
+                                st.session_state[insight_key] = insight
+                        
+                        if st.session_state[insight_key]:
+                            st.markdown(st.session_state[insight_key])
 
-questions = st.session_state["questions"]
+                except Exception as e:
+                    st.error(f"Chart error: {e}")
+            else:
+                # Placeholder while loading
+                st.info("⏳ Waiting for chart data...")
 
-for i, q in enumerate(questions, start=1):
-    st.markdown(f"**{i}. {q}**")
+    # --------------------------------------------------------
+    # 2. CHECK & LOAD MISSING SPECS (At bottom, non-blocking visual)
+    # --------------------------------------------------------
+    missing_spec_qs = [q for q in questions_to_show if q not in st.session_state["chart_specs_map"]]
+    
+    if missing_spec_qs:
+        # Show a spinner at the bottom, NOT clearing previous content
+        with st.spinner(f"Loading {len(missing_spec_qs)} more charts..."):
+            new_specs = generate_chart_specs_batch(missing_spec_qs, meta, client)
+            st.session_state["chart_specs_map"].update(new_specs)
+            st.rerun()
 
-chosen_question = st.radio(
-    "👉 Select a question:",
-    options=questions,
-    index=0,
-)
+    # --------------------------------------------------------
+    # 3. INFINITE SCROLL TRIGGER
+    # --------------------------------------------------------
+    if current_count < len(all_qs) and not missing_spec_qs:
+        st.markdown("---")
+        
+        # We give the button a unique key based on count to force recreation if needed
+        btn_key = f"btn_load_more_{current_count}"
+        
+        if st.button("⬇️ Load Next 4 Charts", key=btn_key, use_container_width=True):
+             st.session_state["loaded_count"] += 4
+             st.rerun()
 
-# ====================================================
-# 3. Generate Chart + Insight
-# ====================================================
-st.subheader("📊 Visualization + 🔍 Insights")
-
-# Ensure some keys exist in session_state
-for key in ["chart_spec", "df_agg", "meta", "chosen_question", "insights_md"]:
-    if key not in st.session_state:
-        st.session_state[key] = None
-
-if st.button("🚀 Generate Chart and Insights"):
-    # 3.1 LLM generates chart spec
-    with st.spinner("LLM is generating chart specification..."):
-        chart_spec = generate_chart_spec_from_question(meta, chosen_question, client)
-
-    # store to session_state
-    st.session_state["chart_spec"] = chart_spec
-    st.session_state["chosen_question"] = chosen_question
-    st.session_state["meta"] = meta
-
-    # 3.2 Aggregate Data
-    with st.spinner("Aggregating data and drawing chart..."):
-        df_agg = aggregate_dataframe(df, chart_spec)
-        st.session_state["df_agg"] = df_agg
-
-# ---- Show chart + insights if we have them in session_state ----
-if st.session_state["chart_spec"] is not None and st.session_state["df_agg"] is not None:
-    chart_spec = st.session_state["chart_spec"]
-    df_agg = st.session_state["df_agg"]
-
-    st.markdown("### Generated Chart Spec")
-    st.json(chart_spec)
-
-    chart_type = chart_spec.get("chart_type")
-    x = chart_spec.get("x")
-    y = chart_spec.get("y")
-    agg = chart_spec.get("aggregation", "none")
-    value_col = f"{agg}_{y}" if agg != "none" else y
-
-    st.markdown("### Aggregated Data (Used for plotting)")
-    st.dataframe(df_agg)
-
-    # Visualization
-    st.markdown("### 📈 Visualization Preview")
-
-    if value_col not in df_agg.columns:
-        st.error(
-            f"The column '{value_col}' is missing from aggregated data. "
-            f"Current columns: {df_agg.columns.tolist()}"
+        # Improved JS Auto-Clicker
+        components.html(
+            f"""
+            <script>
+            const observer = new IntersectionObserver((entries) => {{
+                entries.forEach(entry => {{
+                    if (entry.isIntersecting) {{
+                        const buttons = window.parent.document.querySelectorAll('button');
+                        // Loop backwards to find the one with the specific text
+                        for (let i = buttons.length - 1; i >= 0; i--) {{
+                            if (buttons[i].innerText.includes("Load Next")) {{
+                                buttons[i].click();
+                                break;
+                            }}
+                        }}
+                    }}
+                }});
+            }});
+            const sentinel = document.createElement('div');
+            sentinel.innerText = "Loading more...";
+            sentinel.style.textAlign = "center";
+            sentinel.style.padding = "20px";
+            sentinel.style.color = "#888";
+            document.body.appendChild(sentinel);
+            observer.observe(sentinel);
+            </script>
+            """,
+            height=100, # Give it height so it's easily scrollable-to
         )
-    else:
-        plot_df = df_agg.copy()
 
-        if chart_type == "bar":
-            st.bar_chart(plot_df.set_index(x)[value_col])
-        elif chart_type == "line":
-            st.line_chart(plot_df.set_index(x)[value_col])
-        elif chart_type == "scatter":
-            try:
-                scatter_df = plot_df[[x, value_col]].copy()
-                scatter_df[x] = pd.to_numeric(scatter_df[x], errors="coerce")
-                st.scatter_chart(scatter_df, x=x, y=value_col)
-            except Exception as e:
-                st.error(f"Scatter plot failed: {e}")
-        elif chart_type == "histogram":
-            hist_values = plot_df[value_col].dropna()
-            counts, bins = pd.cut(hist_values, bins=10, retbins=True)
-            hist_df = counts.value_counts().sort_index()
-            hist_plot_df = pd.DataFrame({
-                "bin": hist_df.index.astype(str),
-                "count": hist_df.values,
-            }).set_index("bin")
-            st.bar_chart(hist_plot_df)
-        else:
-            st.error(f"Unsupported chart type: {chart_type}")
-
-    # 3.3 Generate Insights (only generate once, then reuse)
-    if st.session_state["insights_md"] is None:
-        with st.spinner("LLM generating insights..."):
-            insights_md = generate_insights(
-                st.session_state["meta"],
-                chart_spec,
-                df_agg,
-                client,
-            )
-            st.session_state["insights_md"] = insights_md
-
-    st.markdown("### 🔍 Insights")
-    st.markdown(st.session_state["insights_md"])
-
-# ====================================================
-# 4. Refine Chart Style (separate section)
-# ====================================================
-st.subheader("🎨 Optional: Refine chart style with LLM")
-
-if st.session_state["chart_spec"] is None or st.session_state["df_agg"] is None:
-    st.info("Generate a chart first (above), then you can refine its style here.")
-else:
-    if st.button("💅 Refine chart style"):
-        with st.spinner("LLM is refining chart style..."):
-            refined_spec = refine_chart_style(
-                st.session_state["meta"],
-                st.session_state["chosen_question"],
-                st.session_state["chart_spec"],
-                st.session_state["df_agg"],
-                client,
-            )
-            st.session_state["refined_chart_spec"] = refined_spec
-
-    if "refined_chart_spec" in st.session_state and st.session_state["refined_chart_spec"] is not None:
-        st.markdown("### 🎨 Refined Chart Spec (with style)")
-        st.json(st.session_state["refined_chart_spec"])
