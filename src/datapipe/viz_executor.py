@@ -1,6 +1,6 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 
 def apply_filters(df: pd.DataFrame, filters: list) -> pd.DataFrame:
@@ -8,9 +8,14 @@ def apply_filters(df: pd.DataFrame, filters: list) -> pd.DataFrame:
     filtered_df = df.copy()
 
     for f in filters:
-        col = f["column"]
-        op = f["op"]
-        value = f["value"]
+        col = f.get("column")
+        op = f.get("op")
+        value = f.get("value")
+
+        # Validate column exists
+        if col not in filtered_df.columns:
+            print(f"Warning: Filter column '{col}' not found, skipping filter")
+            continue
 
         if op == "==":
             filtered_df = filtered_df[filtered_df[col] == value]
@@ -28,7 +33,7 @@ def apply_filters(df: pd.DataFrame, filters: list) -> pd.DataFrame:
     return filtered_df
 
 
-def aggregate_dataframe(df: pd.DataFrame, spec: Dict[str, Any]) -> pd.DataFrame:
+def aggregate_dataframe(df: pd.DataFrame, spec: Dict[str, Any]) -> Optional[pd.DataFrame]:
     """
     Aggregate dataframe according to the chart spec.
     Supports: sum, mean, count, max, min, median, none.
@@ -47,6 +52,15 @@ def aggregate_dataframe(df: pd.DataFrame, spec: Dict[str, Any]) -> pd.DataFrame:
         agg = agg.lower()
     else:
         agg = "none"
+    
+    # Validate required columns exist
+    if x not in df.columns:
+        print(f"Error: x column '{x}' not found in dataframe")
+        return None
+    
+    if y not in df.columns:
+        print(f"Error: y column '{y}' not found in dataframe")
+        return None
 
     # Work on a copy and ensure y is numeric
     df = df.copy()
@@ -55,10 +69,21 @@ def aggregate_dataframe(df: pd.DataFrame, spec: Dict[str, Any]) -> pd.DataFrame:
     # No aggregation -> return original (filtered) df
     if agg in ("none", "", None):
         return df
+    
+    # For count aggregation, we don't need y to be numeric
+    if agg != "count":
+        # Convert y to numeric for other aggregations
+        df[y] = pd.to_numeric(df[y], errors="coerce")
+        # Drop rows where y couldn't be converted
+        df = df.dropna(subset=[y])
+        
+        if df.empty:
+            print(f"Error: No valid numeric data in column '{y}'")
+            return None
 
     # Build group columns (deduplicated)
     group_cols = [x]
-    if group_by and group_by not in group_cols:
+    if group_by and group_by in df.columns and group_by not in group_cols:
         group_cols.append(group_by)
 
     # Map supported aggregations
@@ -81,16 +106,19 @@ def aggregate_dataframe(df: pd.DataFrame, spec: Dict[str, Any]) -> pd.DataFrame:
 
     new_col_name = f"{agg}_{y}"
 
-    agg_df = (
-        df.groupby(group_cols, dropna=False)[y]
-        .agg(agg_func)
-        .reset_index(name=new_col_name)
-    )
+    try:
+        agg_df = (
+            df.groupby(group_cols, dropna=False)[y]
+            .agg(agg_func)
+            .reset_index(name=new_col_name)
+        )
+        return agg_df
+    except Exception as e:
+        print(f"Error during aggregation: {e}")
+        return None
 
-    return agg_df
 
-
-def execute_chart_spec(df: pd.DataFrame, spec: Dict[str, Any]) -> pd.DataFrame:
+def execute_chart_spec(df: pd.DataFrame, spec: Dict[str, Any]) -> Optional[pd.DataFrame]:
     """
     Execute chart spec:
     1. Filter df
@@ -104,59 +132,63 @@ def execute_chart_spec(df: pd.DataFrame, spec: Dict[str, Any]) -> pd.DataFrame:
     filters = spec.get("filters", [])
     agg = spec.get("aggregation", "none")
 
-    # 1. 过滤
+    # 1. Filter
     df_filtered = apply_filters(df, filters)
+    
+    if df_filtered.empty:
+        print("Warning: No data after filtering")
+        return None
 
-    # 2. 聚合
+    # 2. Aggregate
     df_agg = aggregate_dataframe(df_filtered, spec)
+    
+    if df_agg is None or df_agg.empty:
+        print("Warning: No data after aggregation")
+        return None
 
-    # 3. 确定要画的数值列名
-    #   - 如果有聚合: mean_profit / sum_price / count_order_id ...
-    #   - 没有聚合: 就是原始 y
-    if agg != "none":
+    # 3. Determine value column name
+    if agg and agg.lower() not in ("none", "", None):
         value_col = f"{agg}_{y}"
     else:
         value_col = y
 
     if value_col not in df_agg.columns:
-        # 防御一下，方便调试
-        raise ValueError(
-            f"value_col '{value_col}' not in aggregated dataframe columns: {df_agg.columns.tolist()}"
-        )
+        print(f"Error: value_col '{value_col}' not in aggregated dataframe columns: {df_agg.columns.tolist()}")
+        return None
 
-    # 4. 画图
-    plt.figure(figsize=(6, 4))
+    # 4. Plot (optional - mostly for testing)
+    try:
+        plt.figure(figsize=(6, 4))
 
-    if chart_type == "bar":
-        plt.bar(df_agg[x], df_agg[value_col])
-        plt.xlabel(x)
-        plt.ylabel(value_col)
-        plt.xticks(rotation=45)
-        plt.tight_layout()
+        if chart_type == "bar":
+            plt.bar(df_agg[x], df_agg[value_col])
+            plt.xlabel(x)
+            plt.ylabel(value_col)
+            plt.xticks(rotation=45)
+            plt.tight_layout()
 
-    elif chart_type == "line":
-        plt.plot(df_agg[x], df_agg[value_col])
-        plt.xlabel(x)
-        plt.ylabel(value_col)
-        plt.xticks(rotation=45)
-        plt.tight_layout()
+        elif chart_type == "line":
+            plt.plot(df_agg[x], df_agg[value_col])
+            plt.xlabel(x)
+            plt.ylabel(value_col)
+            plt.xticks(rotation=45)
+            plt.tight_layout()
 
-    elif chart_type == "scatter":
-        plt.scatter(df_agg[x], df_agg[value_col])
-        plt.xlabel(x)
-        plt.ylabel(value_col)
-        plt.xticks(rotation=45)
-        plt.tight_layout()
+        elif chart_type == "scatter":
+            plt.scatter(df_agg[x], df_agg[value_col])
+            plt.xlabel(x)
+            plt.ylabel(value_col)
+            plt.xticks(rotation=45)
+            plt.tight_layout()
 
-    elif chart_type == "histogram":
-        plt.hist(df_agg[value_col])
-        plt.xlabel(value_col)
-        plt.ylabel("count")
-        plt.tight_layout()
+        elif chart_type == "histogram":
+            plt.hist(df_agg[value_col].dropna())
+            plt.xlabel(value_col)
+            plt.ylabel("count")
+            plt.tight_layout()
 
-    else:
-        raise ValueError(f"Unsupported chart type: {chart_type}")
-
-    plt.show()  # API 环境下不弹窗，避免阻塞
+        plt.close()  # Don't show in Streamlit environment
+    except Exception as e:
+        print(f"Warning: Could not plot chart: {e}")
 
     return df_agg
