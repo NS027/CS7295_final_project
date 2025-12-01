@@ -99,31 +99,29 @@ def render_chart(df_agg, spec):
         # Stacked Bar Chart
         elif chart_type == "stacked_bar":
             group_by = spec.get("group_by") or color
-            if group_by:
+            if group_by and group_by in df_agg.columns:
                 fig = px.bar(df_agg, x=x, y=value_col, color=group_by,
                            title=spec.get("title", ""), height=350,
                            barmode='stack')
+                st.plotly_chart(fig, use_container_width=True)
             else:
-                # Fallback to regular bar if no grouping
+                st.warning("Stacked bar chart requires a grouping column. Showing regular bar chart.")
                 fig = px.bar(df_agg, x=x, y=value_col,
                            title=spec.get("title", ""), height=350)
-            st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True)
         
-        # Grouped Bar Chart
         # Grouped Bar Chart
         elif chart_type == "grouped_bar":
             group_by = spec.get("group_by") or color
             if group_by and group_by in df_agg.columns:
-                # Make sure we have aggregated data
                 fig = px.bar(df_agg, x=x, y=value_col, color=group_by,
-                        title=spec.get("title", ""), height=350,
-                        barmode='group')
+                           title=spec.get("title", ""), height=350,
+                           barmode='group')
                 st.plotly_chart(fig, use_container_width=True)
             else:
-                # Fallback to regular bar if no grouping column
                 st.warning("Grouped bar chart requires a grouping column. Showing regular bar chart.")
                 fig = px.bar(df_agg, x=x, y=value_col,
-                        title=spec.get("title", ""), height=350)
+                           title=spec.get("title", ""), height=350)
                 st.plotly_chart(fig, use_container_width=True)
         
         # Box Plot
@@ -144,11 +142,8 @@ def render_chart(df_agg, spec):
             st.bar_chart(df_agg.set_index(x)[value_col], height=300)
             
     except Exception as e:
-        st.error(f"Chart rendering error: {e}")
-        st.write("Debug info:")
-        st.write(f"Chart type: {chart_type}")
-        st.write(f"Columns available: {df_agg.columns.tolist()}")
-        st.dataframe(df_agg.head())
+        # Re-raise to be caught by outer error handler
+        raise e
 
 st.set_page_config(page_title="LLM Data Visualization Assistant", layout="wide")
 st.title("📊🤖 LLM-Powered Data Visualization Assistant")
@@ -157,11 +152,10 @@ st.write("Upload a CSV file and I will help you:")
 st.markdown(
 """
 1. Analyze its structure and generate JSON metadata  
-2. Use an LLM to suggest 5 beginner-friendly analytical questions  
-3. Let you choose one question  
-4. Generate a chart specification (chart spec)  
-5. Aggregate data and produce a visualization  
-6. Generate insights based on the chart  
+2. Use an LLM to suggest 20 beginner-friendly analytical questions  
+3. Generate diverse chart specifications automatically
+4. Aggregate data and produce visualizations  
+5. Generate insights based on the charts  
 """
 )
 
@@ -200,6 +194,8 @@ if "loaded_count" not in st.session_state:
     st.session_state["loaded_count"] = 4
 if "chart_specs_map" not in st.session_state:
     st.session_state["chart_specs_map"] = {}
+if "failed_questions" not in st.session_state:
+    st.session_state["failed_questions"] = []
 
 # Start Analysis Button
 if not st.session_state["all_questions"]:
@@ -210,6 +206,7 @@ if not st.session_state["all_questions"]:
             # Reset
             st.session_state["loaded_count"] = 4 
             st.session_state["chart_specs_map"] = {}
+            st.session_state["failed_questions"] = []
         st.rerun()
 
 # Main Dashboard Loop
@@ -224,25 +221,32 @@ if st.session_state["all_questions"]:
     # 1. RENDER EXISTING CHARTS FIRST (To avoid flicker)
     # --------------------------------------------------------
     cols = st.columns(2)
+    chart_index = 0  # Track position for successful charts only
     
     # We iterate only through what we have specs for, or show placeholder
     for i, question in enumerate(questions_to_show):
-        col = cols[i % 2]
         spec = st.session_state["chart_specs_map"].get(question)
         
-        with col:
-            st.markdown(f"**Q{i+1}. {question}**")
-            
-            if spec:
-                try:
-                    df_agg = aggregate_dataframe(df, spec)
+        # Skip if spec failed to generate or no data
+        if spec is not None:
+            try:
+                df_agg = aggregate_dataframe(df, spec)
+                
+                # If no data, mark as failed and skip rendering
+                if df_agg is None or df_agg.empty:
+                    if question not in st.session_state["failed_questions"]:
+                        st.session_state["failed_questions"].append(question)
+                    continue  # Don't render this question
+                
+                # Successfully have data - render the chart
+                col = cols[chart_index % 2]
+                chart_index += 1
+                
+                with col:
+                    st.markdown(f"**Q{chart_index}. {question}**")
                     
-                    # Add this check before rendering
-                    if df_agg is None or df_agg.empty:
-                        st.warning("⚠️ No data returned for this query")
-                    else:
-                        # Use the new render_chart function
-                        render_chart(df_agg, spec)
+                    # Use the new render_chart function
+                    render_chart(df_agg, spec)
                     
                     # Details Expander
                     with st.expander(f"🔍 View Details & Insights"):
@@ -262,10 +266,17 @@ if st.session_state["all_questions"]:
                         if st.session_state[insight_key]:
                             st.markdown(st.session_state[insight_key])
 
-                except Exception as e:
-                    st.error(f"Chart error: {e}")
-            else:
-                # Placeholder while loading
+            except Exception as e:
+                # Mark as failed on exception
+                if question not in st.session_state["failed_questions"]:
+                    st.session_state["failed_questions"].append(question)
+                continue  # Don't render this question
+        else:
+            # Still loading - show placeholder
+            col = cols[chart_index % 2]
+            chart_index += 1
+            with col:
+                st.markdown(f"**Q{chart_index}. {question}**")
                 st.info("⏳ Waiting for chart data...")
 
     # --------------------------------------------------------
@@ -285,17 +296,25 @@ if st.session_state["all_questions"]:
     # --------------------------------------------------------
     if current_count < len(all_qs) and not missing_spec_qs:
         st.markdown("---")
-
+        
         # Chart type diversity stats in sidebar
-    if st.session_state["chart_specs_map"]:
-        chart_types = [s.get("chart_type", "unknown") 
-                      for s in st.session_state["chart_specs_map"].values() 
-                      if s is not None]
-        if chart_types:
-            type_counts = pd.Series(chart_types).value_counts()
+        if st.session_state["chart_specs_map"]:
+            chart_types = [s.get("chart_type", "unknown") 
+                          for s in st.session_state["chart_specs_map"].values() 
+                          if s is not None]
+            if chart_types:
+                type_counts = pd.Series(chart_types).value_counts()
+                with st.sidebar:
+                    st.subheader("📊 Chart Type Distribution")
+                    st.bar_chart(type_counts)
+        
+        # Display failed questions in sidebar
+        if st.session_state["failed_questions"]:
             with st.sidebar:
-                st.subheader("📊 Chart Type Distribution")
-                st.bar_chart(type_counts)
+                st.subheader("⚠️ Questions Without Charts")
+                st.caption(f"{len(st.session_state['failed_questions'])} questions could not generate valid visualizations:")
+                for idx, failed_q in enumerate(st.session_state["failed_questions"], 1):
+                    st.text(f"{idx}. {failed_q[:80]}{'...' if len(failed_q) > 80 else ''}")
         
         # We give the button a unique key based on count to force recreation if needed
         btn_key = f"btn_load_more_{current_count}"
@@ -317,7 +336,7 @@ if st.session_state["all_questions"]:
                             if (buttons[i].innerText.includes("Load Next")) {{
                                 buttons[i].click();
                                 break;
-                            }}
+                            }}c
                         }}
                     }}
                 }});
@@ -331,6 +350,5 @@ if st.session_state["all_questions"]:
             observer.observe(sentinel);
             </script>
             """,
-            height=100, # Give it height so it's easily scrollable-to
+            height=100,
         )
-
