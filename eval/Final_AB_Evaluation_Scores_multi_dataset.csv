@@ -1,7 +1,7 @@
 Evaluator_ID,Dataset,A_Question_Clarity,A_Analytical_Depth,A_Data_Answerability,A_Visualization_Appropriateness,A_Encoding_Correctness,A_Readability_Visual_Design,A_QV_Alignment,A_Overall_Usefulness,A_Operational_Complexity,B_Question_Clarity,B_Analytical_Depth,B_Data_Answerability,B_Visualization_Appropriateness,B_Encoding_Correctness,B_Readability_Visual_Design,B_QV_Alignment,B_Overall_Usefulness,Optional_Comments,B_Operational_Complexity
-E1,penguins,,,,,,,,,,,,,,,,,,,
-E1,iris,,,,,,,,,,,,,,,,,,,
-E1,tips,,,,,,,,,,,,,,,,,,,
+E1,penguins,5,4,4,4,4,4,4,3,2,5,4,4,5,4,5,5,4,,5
+E1,iris,5,3,5,5,5,5,5,4,3,5,4,5,5,5,5,5,4,,5
+E1,tips,5,5,1,1,1,1,1,2,1,5,5,4,4,5,4,5,4,,5
 E2,penguins,,,,,,,,,,,,,,,,,,,
 E2,iris,,,,,,,,,,,,,,,,,,,
 E2,tips,,,,,,,,,,,,,,,,,,,
