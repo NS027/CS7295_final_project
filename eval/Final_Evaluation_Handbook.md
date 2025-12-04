@@ -53,7 +53,7 @@ After you review all outputs:
 -   Give **one overall score for Condition A**
 -   Give **one overall score for Condition B**
 
-Use the **same 8 evaluation dimensions** for both conditions. Each
+Use the **same 9 evaluation dimensions** for both conditions. Each
 dimension is scored from **1 (Poor) to 5 (Excellent)**.
 
 ------------------------------------------------------------------------
@@ -80,46 +80,62 @@ Measures whether the question reflects meaningful analytical thinking.
 
 ### 3. Data Answerability
 
-Measures whether the question can be answered using the given dataset. -
-1 = Cannot be answered with the dataset - 2 = Heavily dependent on
-assumptions or external data - 3 = Partially answerable - 4 = Mostly
-answerable - 5 = Clearly and fully answerable
+Measures whether the question can be answered using the given dataset. 
+- 1 = Cannot be answered with the dataset 
+- 2 = Heavily dependent on assumptions or external data 
+- 3 = Partially answerable 
+- 4 = Mostly answerable 
+- 5 = Clearly and fully answerable
 
 ### 4. Visualization Appropriateness
 
 Measures whether the selected chart type is suitable for the question
-and data. - 1 = Completely inappropriate - 2 = Poor choice - 3 =
-Acceptable but not ideal - 4 = Appropriate - 5 = Optimal and
-professional choice
+and data. 
+- 1 = Completely inappropriate 
+- 2 = Poor choice 
+- 3 = Acceptable but not ideal 
+- 4 = Appropriate  
+- 5 = Optimal and professional choice
 
 ### 5. Encoding Correctness
 
-Measures whether fields are correctly mapped to visual channels. - 1 =
-Major encoding errors - 2 = Several incorrect mappings - 3 = Mostly
-correct with minor issues - 4 = Correct with clear logic - 5 = Fully
-correct and rigorous mapping
+Measures whether fields are correctly mapped to visual channels. 
+- 1 = Major encoding errors 
+- 2 = Several incorrect mappings 
+- 3 = Mostly correct with minor issues 
+- 4 = Correct with clear logic 
+- 5 = Fully correct and rigorous mapping
 
 ### 6. Readability & Visual Design
 
-Measures whether the visualization is easy to read and interpret. - 1 =
-Very difficult to read - 2 = Difficult to interpret - 3 = Acceptable
-readability - 4 = Clear and readable - 5 = Very clear and intuitive
+Measures whether the visualization is easy to read and interpret. 
+- 1 = Very difficult to read 
+- 2 = Difficult to interpret 
+- 3 = Acceptable readability 
+- 4 = Clear and readable 
+- 5 = Very clear and intuitive
 
 For Condition A, judge based on the clarity of the visualization
 description. For Condition B, judge based on the actual rendered chart.
 
 ### 7. Question--Visualization Alignment
 
-Measures whether the visualization truly answers the question. - 1 = No
-alignment - 2 = Very weak alignment - 3 = Partial alignment - 4 = Strong
-alignment - 5 = Perfect alignment
+Measures whether the visualization truly answers the question. 
+- 1 = No alignment 
+- 2 = Very weak alignment 
+- 3 = Partial alignment 
+- 4 = Strong alignment 
+- 5 = Perfect alignment
 
 ### 8. Overall Usefulness
 
 Measures the practical value of the outputs in a real analysis
-scenario. - 1 = Not useful at all - 2 = Low practical value - 3 =
-Moderately useful - 4 = Useful in practice - 5 = Highly useful for real
-decision-making
+scenario. 
+- 1 = Not useful at all 
+- 2 = Low practical value 
+- 3 = Moderately useful 
+- 4 = Useful in practice 
+- 5 = Highly useful for real decision-making
 
 ### 9. Operational Complexity (Ease of Use)
 
