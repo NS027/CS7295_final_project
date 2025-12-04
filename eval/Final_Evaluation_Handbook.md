@@ -134,3 +134,20 @@ Please complete the provided CSV scoring sheet and return it to the
 organizer.
 
 Thank you for your participation.
+
+---
+## 9. Dataset
+
+We evaluate our system using three real-world, small-to-medium scale datasets to ensure diversity in data characteristics while maintaining comparable data volume.
+
+1. **Palmer Penguins Dataset**  
+   https://github.com/allisonhorst/palmerpenguins  
+   A biological measurement dataset containing morphological measurements of penguins across different species, islands, and years.
+
+2. **Iris Dataset**  
+   https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv  
+   A classic multivariate dataset containing sepal and petal measurements of three species of iris flowers.
+
+3. **Tips Dataset (Restaurant Tips)**  
+   https://raw.githubusercontent.com/mwaskom/seaborn-data/master/tips.csv  
+   A behavioral dataset containing restaurant bills and gratuities with categorical attributes such as sex, smoking status, day, and time.
