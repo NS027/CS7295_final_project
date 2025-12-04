@@ -62,17 +62,21 @@ dimension is scored from **1 (Poor) to 5 (Excellent)**.
 
 ### 1. Question Clarity
 
-Measures whether the question is clearly stated and unambiguous. - 1 =
-Very unclear or confusing - 2 = Somewhat unclear - 3 = Generally clear,
-but imprecise - 4 = Clear and well stated - 5 = Very clear, precise, and
-unambiguous
+Measures whether the question is clearly stated and unambiguous. 
+- 1 = Very unclear or confusing 
+- 2 = Somewhat unclear 
+- 3 = Generally clear,but imprecise 
+- 4 = Clear and well stated 
+- 5 = Very clear, precise, and unambiguous
 
 ### 2. Analytical Depth
 
-Measures whether the question reflects meaningful analytical thinking. -
-1 = Purely descriptive or trivial - 2 = Very limited analytical value -
-3 = Moderate analytical value - 4 = Strong analytical intent - 5 =
-Expert-level analytical depth
+Measures whether the question reflects meaningful analytical thinking. 
+- 1 = Purely descriptive or trivial 
+- 2 = Very limited analytical value 
+- 3 = Moderate analytical value 
+- 4 = Strong analytical intent 
+- 5 = Expert-level analytical depth
 
 ### 3. Data Answerability
 
@@ -116,6 +120,16 @@ Measures the practical value of the outputs in a real analysis
 scenario. - 1 = Not useful at all - 2 = Low practical value - 3 =
 Moderately useful - 4 = Useful in practice - 5 = Highly useful for real
 decision-making
+
+### 9. Operational Complexity (Ease of Use)
+
+Measures how easy and convenient it is to use the system to obtain the final question–visualization outputs.
+
+- 1 = Very difficult to use; requires many steps, manual adjustments, or has frequent failures
+- 2 = Difficult; the process is cumbersome and not intuitive
+- 3 = Moderate; usable but requires noticeable effort
+- 4 = Easy to use with minor friction
+- 5 = Very easy and smooth to use; minimal effort required from the user
 
 ------------------------------------------------------------------------
 
