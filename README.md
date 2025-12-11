@@ -109,6 +109,10 @@ http://127.0.0.1:8000/docs
 streamlit run ui_app.py
 ```
 
+## 🎥 Demo Video
+
+[![Demo Video](https://img.youtube.com/vi/lau9mDBBHn4/0.jpg)](https://youtu.be/lau9mDBBHn4)
+
 ## 🖼 Screenshots
 
 ### Prototype  
